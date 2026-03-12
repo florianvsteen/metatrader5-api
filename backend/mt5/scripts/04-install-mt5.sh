@@ -31,6 +31,11 @@ else
     DISPLAY=:0 $wine_executable reg add "HKEY_CURRENT_USER\\Software\\Wine" /v Version /t REG_SZ /d "win10" /f
     DISPLAY=:0 wineserver --wait
 
+    # Suppress mountmgr disk detection that causes installer to crash
+    log_message "INFO" "Applying Wine registry fixes..."
+    DISPLAY=:0 $wine_executable reg add "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\MountMgr" /v Start /t REG_DWORD /d 4 /f
+    DISPLAY=:0 wineserver --wait
+
     # Install root certificates so Wine can verify MetaQuotes CDN TLS
     log_message "INFO" "Installing Wine certificates..."
     DISPLAY=:0 winetricks -q certs
@@ -62,17 +67,18 @@ else
     fi
     log_message "INFO" "Download complete: $(ls -lh /tmp/mt5setup.exe | awk '{print $5}')"
 
-    # Run installer with HTTP debug logging
+    # Run installer - write debug log to /tmp (writable)
     log_message "INFO" "Running MT5 installer..."
     DISPLAY=:0 WINEDEBUG=+winhttp,+wininet,err+all \
-        $wine_executable /tmp/mt5setup.exe /auto 2>&1 | tee -a /var/log/mt5_wine_debug.log
+        $wine_executable /tmp/mt5setup.exe /auto 2>&1 | tee /tmp/mt5_wine_debug.log
     DISPLAY=:0 wineserver --wait
     log_message "INFO" "Installer process exited."
 
-    # Dump relevant Wine HTTP debug lines
+    # Dump relevant Wine HTTP debug lines to stdout for Portainer
     log_message "INFO" "=== WINE HTTP DEBUG ==="
     grep -i "winhttp\|wininet\|connect\|error\|fail\|https\|download" \
-        /var/log/mt5_wine_debug.log 2>/dev/null | head -50
+        /tmp/mt5_wine_debug.log 2>/dev/null | head -50
+    log_message "INFO" "=== END WINE HTTP DEBUG ==="
 
     # Poll for completion
     log_message "INFO" "Waiting for MT5 to finish installing..."
