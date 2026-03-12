@@ -13,6 +13,14 @@ else
     # Set Wine to Windows 10 mode
     DISPLAY=:0 $wine_executable reg add "HKEY_CURRENT_USER\\Software\\Wine" /v Version /t REG_SZ /d "win10" /f
 
+    # Install root certificates so Wine can verify MetaQuotes CDN TLS
+    log_message "INFO" "Installing Wine certificates..."
+    DISPLAY=:0 winetricks -q certs
+
+    # Install winhttp so the MT5 installer can make HTTPS calls internally
+    log_message "INFO" "Installing winhttp..."
+    DISPLAY=:0 winetricks -q winhttp
+
     # Wait for network
     log_message "INFO" "Waiting for network..."
     for i in $(seq 1 10); do
@@ -21,7 +29,7 @@ else
         sleep 5
     done
 
-    # Download installer via Linux wget (bypasses Wine network stack)
+    # Download installer
     log_message "INFO" "Downloading MT5 installer..."
     wget --tries=5 --timeout=120 --waitretry=10 \
         --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
@@ -35,7 +43,7 @@ else
     log_message "INFO" "Running MT5 installer..."
     DISPLAY=:0 WINEDEBUG=err+all $wine_executable /tmp/mt5setup.exe /auto
 
-    # Poll for completion — installer runs async
+    # Poll for completion
     log_message "INFO" "Waiting for MT5 to finish installing..."
     for i in $(seq 1 72); do
         if [ -e "$mt5file" ]; then
