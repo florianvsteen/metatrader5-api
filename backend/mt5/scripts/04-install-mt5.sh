@@ -30,22 +30,26 @@ else
     DISPLAY=:0 $wine_executable reg add "HKEY_CURRENT_USER\\Software\\Wine" /v Version /t REG_SZ /d "win10" /f
     DISPLAY=:0 wineserver --wait
 
-    # Install all required runtime dependencies for MT5
-    log_message "INFO" "Installing vcrun2019 (Visual C++ runtime)..."
-    DISPLAY=:0 winetricks -q vcrun2019
+    # Install vcrun2019 with --force to bypass sha256 mismatch in old winetricks
+    log_message "INFO" "Installing vcrun2019 (forced)..."
+    DISPLAY=:0 winetricks -q --force vcrun2019
     DISPLAY=:0 wineserver --wait
 
-    log_message "INFO" "Installing dotnet48..."
-    DISPLAY=:0 winetricks -q dotnet48
-    DISPLAY=:0 wineserver --wait
-
+    # Install winhttp
     log_message "INFO" "Installing winhttp..."
     DISPLAY=:0 winetricks -q winhttp
     DISPLAY=:0 wineserver --wait
 
-    log_message "INFO" "Installing root certificates..."
-    DISPLAY=:0 winetricks -q rootcerts
-    DISPLAY=:0 wineserver --wait
+    # Manually install CA certificates into Wine (winetricks certs/rootcerts broken in this version)
+    log_message "INFO" "Installing CA certificates into Wine manually..."
+    if [ -f /etc/ssl/certs/ca-certificates.crt ]; then
+        cp /etc/ssl/certs/ca-certificates.crt "$WINEPREFIX/drive_c/windows/system32/"
+        DISPLAY=:0 $wine_executable reg add \
+            "HKLM\\Software\\Microsoft\\SystemCertificates\\ROOT\\Certificates" /f 2>/dev/null || true
+        log_message "INFO" "CA certificates copied."
+    else
+        log_message "WARNING" "ca-certificates.crt not found, skipping cert install."
+    fi
 
     # Wait for network
     log_message "INFO" "Waiting for network..."
@@ -68,7 +72,7 @@ else
     fi
     log_message "INFO" "Download complete: $(ls -lh /tmp/mt5setup.exe | awk '{print $5}')"
 
-    # Run installer with explicit path
+    # Run installer - attempt 1: /auto with explicit path
     log_message "INFO" "Running MT5 installer (attempt 1: /auto /InstallPath)..."
     DISPLAY=:0 WINEDEBUG=+winhttp,+wininet,err+all \
         $wine_executable /tmp/mt5setup.exe /auto \
@@ -77,9 +81,9 @@ else
     log_message "INFO" "Attempt 1 exited."
 
     if [ ! -e "$mt5file" ]; then
-        log_message "INFO" "Attempt 1 failed. Trying /auto /portable..."
+        log_message "INFO" "Attempt 1 failed. Trying /auto only..."
         DISPLAY=:0 WINEDEBUG=+winhttp,+wininet,err+all \
-            $wine_executable /tmp/mt5setup.exe /auto /portable 2>&1 | tee /tmp/mt5_wine_debug.log
+            $wine_executable /tmp/mt5setup.exe /auto 2>&1 | tee /tmp/mt5_wine_debug.log
         DISPLAY=:0 wineserver --wait
         log_message "INFO" "Attempt 2 exited."
     fi
@@ -92,9 +96,9 @@ else
         log_message "INFO" "Attempt 3 exited."
     fi
 
-    # Dump Wine HTTP debug
-    log_message "INFO" "=== WINE DEBUG OUTPUT ==="
-    cat /tmp/mt5_wine_debug.log 2>/dev/null | grep -v "^$" | head -100
+    # Full debug dump
+    log_message "INFO" "=== FULL WINE DEBUG OUTPUT ==="
+    cat /tmp/mt5_wine_debug.log 2>/dev/null | grep -v "^$" | head -150
     log_message "INFO" "=== END WINE DEBUG ==="
 
     # Poll for completion
