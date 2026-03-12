@@ -12,6 +12,11 @@ services:
     ports:
       - "6789:3000"   # VNC
       - "6868:5001"   # API
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   postgres:
     image: postgres:15-alpine
@@ -21,6 +26,11 @@ services:
       - postgres-data:/var/lib/postgresql/data
     networks:
       - openclaw_shared
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   django:
     build:
@@ -37,6 +47,11 @@ services:
       - redis
     networks:
       - openclaw_shared
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:6
@@ -46,6 +61,11 @@ services:
       - "6379:6379"
     networks:
       - openclaw_shared
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   celery:
     build:
@@ -61,6 +81,11 @@ services:
     networks:
       - openclaw_shared
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   celery-beat:
     build:
@@ -76,6 +101,11 @@ services:
     networks:
       - openclaw_shared
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   postgres-data: {}
