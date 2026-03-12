@@ -31,8 +31,9 @@ RUN wget -q https://dl.winehq.org/wine-builds/winehq.key > /dev/null 2>&1\
     && rm winehq.key
 
 # Add i386 architecture and update package lists
-RUN dpkg --add-architecture i386 \
-    && apt-get update
+RUN dpkg --add-architecture i386 && \
+    apt-get update && \
+    apt-get install -y wine32
 
 # Install WineHQ stable package and dependencies
 RUN apt-get install --install-recommends -y \
