@@ -10,7 +10,7 @@ services:
       - openclaw_shared
     restart: unless-stopped
     ports:
-      - "3000:3000"   # VNC
+      - "6789:3000"   # VNC
       - "6767:5001"   # API
 
   postgres:
