@@ -1,26 +1,24 @@
-# Stage 1: Base image with apt packages
-FROM ghcr.io/linuxserver/baseimage-kasmvnc:arch-version-2025-07-12@sha256:41e3f93e819658f816621fd5f6ad75d6300ed96d3300f4a346af799ed09985f2 AS base
+FROM --platform=linux/amd64 ghcr.io/linuxserver/baseimage-kasmvnc:ubuntujammy AS base
+
 ENV TITLE=MetaTrader
 ENV WINEARCH=win64
 ENV WINEPREFIX="/config/.wine"
 ENV DISPLAY=:0
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Ensure the directory exists with correct permissions
 RUN mkdir -p /config/.wine && \
     chown -R abc:abc /config/.wine && \
     chmod -R 755 /config/.wine
 
-# Update package lists and upgrade packages
-RUN apt-get update && apt-get upgrade -y
-
-# Install required packages
-RUN apt-get install -y \
+RUN apt-get update && apt-get install -y \
     dos2unix \
     python3-pip \
     wget \
-    python3-pyxdg \
-    netcat \
-    && pip3 install --upgrade pip
+    python3-xdg \
+    netcat-openbsd \
+    && pip3 install --upgrade pip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Add WineHQ repository key and APT source
 RUN wget -q https://dl.winehq.org/wine-builds/winehq.key > /dev/null 2>&1\
