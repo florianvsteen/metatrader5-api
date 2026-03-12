@@ -16,10 +16,12 @@ RUN apt-get update && apt-get install -y \
     wget \
     python3-xdg \
     netcat-openbsd \
+    winetricks \
+    cabextract \
     && pip3 install --upgrade pip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-
+    
 # Add WineHQ repository key and APT source
 RUN wget -q https://dl.winehq.org/wine-builds/winehq.key > /dev/null 2>&1\
     && apt-key add winehq.key \
