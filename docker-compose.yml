@@ -12,6 +12,8 @@ services:
     ports:
       - "6789:3000"   # VNC
       - "6868:5001"   # API
+    security_opt:
+      - seccomp=unconfined
     logging:
       driver: "json-file"
       options:
