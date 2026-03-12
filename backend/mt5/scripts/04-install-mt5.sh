@@ -25,50 +25,86 @@ else
     DISPLAY=:0 wineserver --wait
     log_message "INFO" "Wine prefix initialized."
 
-    # Set Wine to Windows 10 mode
-    log_message "INFO" "Setting Wine to Windows 10 mode..."
-    DISPLAY=:0 $wine_executable reg add "HKEY_CURRENT_USER\\Software\\Wine" /v Version /t REG_SZ /d "win10" /f
-    DISPLAY=:0 wineserver --wait
+    # --- FIX: manually seed ucrtbase.dll into syswow64 ---
+    # winetricks cannot install vcrun2019 because regedit itself needs ucrtbase.dll
+    # Wine ships 32-bit DLLs on the host in /usr/lib/i386-linux-gnu/wine/
+    # We copy them directly into the Wine prefix syswow64 directory.
+    log_message "INFO" "Seeding 32-bit ucrtbase.dll into Wine prefix..."
 
-    # Copy ucrtbase.dll from Wine's own 64-bit to syswow64 (32-bit) if missing
-    log_message "INFO" "Checking ucrtbase.dll in syswow64..."
     SYSWOW64="$WINEPREFIX/drive_c/windows/syswow64"
     SYSTEM32="$WINEPREFIX/drive_c/windows/system32"
 
-    if [ ! -f "$SYSWOW64/ucrtbase.dll" ]; then
-        log_message "INFO" "ucrtbase.dll missing from syswow64 - installing via winetricks..."
-        DISPLAY=:0 winetricks -q --force ucrtbase2019
-        DISPLAY=:0 wineserver --wait
+    # Wine 32-bit DLL locations on Debian/Ubuntu
+    WINE32_PATHS=(
+        "/usr/lib/i386-linux-gnu/wine/i386-windows"
+        "/usr/lib/i386-linux-gnu/wine"
+        "/usr/lib32/wine/i386-windows"
+        "/usr/lib32/wine"
+    )
+
+    wine32_dir=""
+    for p in "${WINE32_PATHS[@]}"; do
+        if [ -f "$p/ucrtbase.dll" ]; then
+            wine32_dir="$p"
+            log_message "INFO" "Found Wine 32-bit DLLs at: $p"
+            break
+        fi
+    done
+
+    if [ -n "$wine32_dir" ]; then
+        # Copy key 32-bit DLLs that are missing from syswow64
+        for dll in ucrtbase.dll sechost.dll; do
+            if [ -f "$wine32_dir/$dll" ] && [ ! -f "$SYSWOW64/$dll" ]; then
+                cp "$wine32_dir/$dll" "$SYSWOW64/$dll"
+                log_message "INFO" "Copied $dll to syswow64"
+            fi
+        done
     else
-        log_message "INFO" "ucrtbase.dll already present in syswow64."
+        log_message "WARNING" "Wine 32-bit DLL directory not found. Searching..."
+        find /usr/lib -name "ucrtbase.dll" 2>/dev/null | head -5 | while read f; do
+            log_message "INFO" "Found: $f"
+        done
+
+        # Try to install wine32 packages if missing
+        log_message "INFO" "Attempting to install wine32 i386 support..."
+        dpkg --add-architecture i386 2>/dev/null || true
+        apt-get update -qq 2>/dev/null || true
+        apt-get install -y -qq wine32 2>/dev/null || true
+
+        # Search again after potential install
+        for p in "${WINE32_PATHS[@]}"; do
+            if [ -f "$p/ucrtbase.dll" ]; then
+                wine32_dir="$p"
+                break
+            fi
+        done
+        if [ -n "$wine32_dir" ]; then
+            cp "$wine32_dir/ucrtbase.dll" "$SYSWOW64/ucrtbase.dll" 2>/dev/null || true
+            log_message "INFO" "Copied ucrtbase.dll after wine32 install"
+        fi
     fi
 
-    # Install vcrun2019 with --force to bypass sha256 mismatch
+    # Verify the DLL is now present
+    if [ -f "$SYSWOW64/ucrtbase.dll" ]; then
+        log_message "INFO" "OK: ucrtbase.dll is present in syswow64"
+    else
+        log_message "WARNING" "ucrtbase.dll still missing - install may still fail"
+    fi
+
+    # Set Wine to Windows 10 mode
+    log_message "INFO" "Setting Wine to Windows 10 mode..."
+    DISPLAY=:0 $wine_executable reg add "HKEY_CURRENT_USER\\Software\\Wine" /v Version /t REG_SZ /d "win10" /f 2>/dev/null
+    DISPLAY=:0 wineserver --wait
+
+    # Now install vcrun2019 - regedit should work now that ucrtbase exists
     log_message "INFO" "Installing vcrun2019 (forced)..."
-    DISPLAY=:0 winetricks -q --force vcrun2019
+    DISPLAY=:0 winetricks -q --force vcrun2019 2>&1 || log_message "WARNING" "vcrun2019 install had errors (may be ok)"
     DISPLAY=:0 wineserver --wait
 
     # Install winhttp
     log_message "INFO" "Installing winhttp..."
-    DISPLAY=:0 winetricks -q winhttp
+    DISPLAY=:0 winetricks -q winhttp 2>&1 || true
     DISPLAY=:0 wineserver --wait
-
-    # Manually install CA certificates into Wine
-    log_message "INFO" "Installing CA certificates into Wine manually..."
-    if [ -f /etc/ssl/certs/ca-certificates.crt ]; then
-        cp /etc/ssl/certs/ca-certificates.crt "$SYSTEM32/"
-        log_message "INFO" "CA certificates copied to system32."
-    fi
-
-    # Verify ucrtbase.dll is now present
-    log_message "INFO" "Verifying DLL presence..."
-    for dll in ucrtbase.dll sechost.dll advapi32.dll user32.dll; do
-        if [ -f "$SYSWOW64/$dll" ]; then
-            log_message "INFO" "OK: $dll present in syswow64"
-        else
-            log_message "WARNING" "MISSING: $dll in syswow64"
-        fi
-    done
 
     # Wait for network
     log_message "INFO" "Waiting for network..."
@@ -77,7 +113,6 @@ else
         log_message "INFO" "Network not ready, attempt $i/10..."
         sleep 5
     done
-    log_message "INFO" "Network is ready."
 
     # Download installer
     log_message "INFO" "Downloading MT5 installer..."
@@ -85,33 +120,32 @@ else
         --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
         -O /tmp/mt5setup.exe "$mt5setup_url"
 
-    if [ ! -f /tmp/mt5setup.exe ] || [ ! -s /tmp/mt5setup.exe ]; then
+    if [ ! -s /tmp/mt5setup.exe ]; then
         log_message "ERROR" "Download failed or file is empty."
         exit 1
     fi
     log_message "INFO" "Download complete: $(ls -lh /tmp/mt5setup.exe | awk '{print $5}')"
 
-    # Run installer
+    # Run MT5 installer
     log_message "INFO" "Running MT5 installer..."
     DISPLAY=:0 WINEDEBUG=err+all \
         $wine_executable /tmp/mt5setup.exe /auto \
         "/InstallPath=C:\\Program Files\\MetaTrader 5" 2>&1 | tee /tmp/mt5_wine_debug.log
     DISPLAY=:0 wineserver --wait
-    log_message "INFO" "Installer exited."
 
-    # Dump any remaining errors
-    log_message "INFO" "=== WINE ERRORS ==="
-    grep -i "err:\|failed\|missing\|not found" /tmp/mt5_wine_debug.log 2>/dev/null | head -50
-    log_message "INFO" "=== END WINE ERRORS ==="
+    # Show only unique errors
+    log_message "INFO" "=== UNIQUE WINE ERRORS ==="
+    grep -i "err:" /tmp/mt5_wine_debug.log 2>/dev/null | sort -u | head -30
+    log_message "INFO" "=== END ERRORS ==="
 
-    # Poll for completion
-    log_message "INFO" "Waiting for MT5 binary..."
+    # Poll for binary
+    log_message "INFO" "Waiting for MT5 binary (up to 6 min)..."
     for i in $(seq 1 72); do
         if [ -e "$mt5file" ]; then
             log_message "INFO" "MT5 binary detected at iteration $i."
             break
         fi
-        log_message "INFO" "Waiting... ($i/72)"
+        [ $((i % 6)) -eq 0 ] && log_message "INFO" "Waiting... ($i/72)"
         sleep 5
     done
 
@@ -120,8 +154,10 @@ fi
 
 # Verify and launch
 if [ -e "$mt5file" ]; then
-    log_message "INFO" "MT5 installed. Launching..."
+    log_message "INFO" "MT5 installed successfully. Launching..."
     DISPLAY=:0 $wine_executable "$mt5file" &
 else
     log_message "ERROR" "MT5 binary not found after all install attempts."
+    log_message "INFO" "Listing Wine C drive for diagnostics..."
+    find "$WINEPREFIX/drive_c/Program Files" -maxdepth 2 2>/dev/null | head -20
 fi
