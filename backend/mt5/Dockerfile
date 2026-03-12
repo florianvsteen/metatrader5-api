@@ -21,7 +21,9 @@ RUN apt-get update && apt-get install -y \
     && pip3 install --upgrade pip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-    
+
+RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
+
 # Add WineHQ repository key and APT source
 RUN wget -q https://dl.winehq.org/wine-builds/winehq.key > /dev/null 2>&1\
     && apt-key add winehq.key \
