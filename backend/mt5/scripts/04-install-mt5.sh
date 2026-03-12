@@ -1,5 +1,8 @@
 #!/bin/bash
 source /scripts/02-common.sh
+
+exec 1> >(tee -a /var/log/mt5_setup.log) 2>&1
+
 log_message "RUNNING" "04-install-mt5.sh"
 
 if [ -e "$mt5file" ]; then
@@ -30,12 +33,16 @@ else
     fi
 
     log_message "INFO" "Running MT5 installer..."
-    DISPLAY=:0 $wine_executable /tmp/mt5setup.exe /auto
+    DISPLAY=:0 WINEDEBUG=err+all $wine_executable /tmp/mt5setup.exe /auto
 
     # Poll for completion — installer runs async
     log_message "INFO" "Waiting for MT5 to finish installing..."
     for i in $(seq 1 72); do
-        [ -e "$mt5file" ] && break
+        if [ -e "$mt5file" ]; then
+            log_message "INFO" "MT5 binary detected at iteration $i."
+            break
+        fi
+        log_message "INFO" "Waiting... ($i/72)"
         sleep 5
     done
 
@@ -47,7 +54,5 @@ if [ -e "$mt5file" ]; then
     log_message "INFO" "MT5 installed. Launching..."
     DISPLAY=:0 $wine_executable "$mt5file" &
 else
-    log_message "ERROR" "MT5 binary not found after install. Check /var/log/mt5_setup.log"
-    # Dump Wine logs for diagnosis
-    DISPLAY=:0 WINEDEBUG=err+all $wine_executable /tmp/mt5setup.exe /auto 2>> /var/log/mt5_setup.log
+    log_message "ERROR" "MT5 binary not found after install. See logs above for Wine errors."
 fi
