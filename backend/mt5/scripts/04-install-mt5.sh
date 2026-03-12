@@ -30,7 +30,20 @@ else
     DISPLAY=:0 $wine_executable reg add "HKEY_CURRENT_USER\\Software\\Wine" /v Version /t REG_SZ /d "win10" /f
     DISPLAY=:0 wineserver --wait
 
-    # Install vcrun2019 with --force to bypass sha256 mismatch in old winetricks
+    # Copy ucrtbase.dll from Wine's own 64-bit to syswow64 (32-bit) if missing
+    log_message "INFO" "Checking ucrtbase.dll in syswow64..."
+    SYSWOW64="$WINEPREFIX/drive_c/windows/syswow64"
+    SYSTEM32="$WINEPREFIX/drive_c/windows/system32"
+
+    if [ ! -f "$SYSWOW64/ucrtbase.dll" ]; then
+        log_message "INFO" "ucrtbase.dll missing from syswow64 - installing via winetricks..."
+        DISPLAY=:0 winetricks -q --force ucrtbase2019
+        DISPLAY=:0 wineserver --wait
+    else
+        log_message "INFO" "ucrtbase.dll already present in syswow64."
+    fi
+
+    # Install vcrun2019 with --force to bypass sha256 mismatch
     log_message "INFO" "Installing vcrun2019 (forced)..."
     DISPLAY=:0 winetricks -q --force vcrun2019
     DISPLAY=:0 wineserver --wait
@@ -40,16 +53,22 @@ else
     DISPLAY=:0 winetricks -q winhttp
     DISPLAY=:0 wineserver --wait
 
-    # Manually install CA certificates into Wine (winetricks certs/rootcerts broken in this version)
+    # Manually install CA certificates into Wine
     log_message "INFO" "Installing CA certificates into Wine manually..."
     if [ -f /etc/ssl/certs/ca-certificates.crt ]; then
-        cp /etc/ssl/certs/ca-certificates.crt "$WINEPREFIX/drive_c/windows/system32/"
-        DISPLAY=:0 $wine_executable reg add \
-            "HKLM\\Software\\Microsoft\\SystemCertificates\\ROOT\\Certificates" /f 2>/dev/null || true
-        log_message "INFO" "CA certificates copied."
-    else
-        log_message "WARNING" "ca-certificates.crt not found, skipping cert install."
+        cp /etc/ssl/certs/ca-certificates.crt "$SYSTEM32/"
+        log_message "INFO" "CA certificates copied to system32."
     fi
+
+    # Verify ucrtbase.dll is now present
+    log_message "INFO" "Verifying DLL presence..."
+    for dll in ucrtbase.dll sechost.dll advapi32.dll user32.dll; do
+        if [ -f "$SYSWOW64/$dll" ]; then
+            log_message "INFO" "OK: $dll present in syswow64"
+        else
+            log_message "WARNING" "MISSING: $dll in syswow64"
+        fi
+    done
 
     # Wait for network
     log_message "INFO" "Waiting for network..."
@@ -72,34 +91,18 @@ else
     fi
     log_message "INFO" "Download complete: $(ls -lh /tmp/mt5setup.exe | awk '{print $5}')"
 
-    # Run installer - attempt 1: /auto with explicit path
-    log_message "INFO" "Running MT5 installer (attempt 1: /auto /InstallPath)..."
-    DISPLAY=:0 WINEDEBUG=+winhttp,+wininet,err+all \
+    # Run installer
+    log_message "INFO" "Running MT5 installer..."
+    DISPLAY=:0 WINEDEBUG=err+all \
         $wine_executable /tmp/mt5setup.exe /auto \
         "/InstallPath=C:\\Program Files\\MetaTrader 5" 2>&1 | tee /tmp/mt5_wine_debug.log
     DISPLAY=:0 wineserver --wait
-    log_message "INFO" "Attempt 1 exited."
+    log_message "INFO" "Installer exited."
 
-    if [ ! -e "$mt5file" ]; then
-        log_message "INFO" "Attempt 1 failed. Trying /auto only..."
-        DISPLAY=:0 WINEDEBUG=+winhttp,+wininet,err+all \
-            $wine_executable /tmp/mt5setup.exe /auto 2>&1 | tee /tmp/mt5_wine_debug.log
-        DISPLAY=:0 wineserver --wait
-        log_message "INFO" "Attempt 2 exited."
-    fi
-
-    if [ ! -e "$mt5file" ]; then
-        log_message "INFO" "Attempt 2 failed. Trying interactive (check VNC)..."
-        DISPLAY=:0 WINEDEBUG=+winhttp,+wininet,err+all \
-            $wine_executable /tmp/mt5setup.exe 2>&1 | tee /tmp/mt5_wine_debug.log
-        DISPLAY=:0 wineserver --wait
-        log_message "INFO" "Attempt 3 exited."
-    fi
-
-    # Full debug dump
-    log_message "INFO" "=== FULL WINE DEBUG OUTPUT ==="
-    cat /tmp/mt5_wine_debug.log 2>/dev/null | grep -v "^$" | head -150
-    log_message "INFO" "=== END WINE DEBUG ==="
+    # Dump any remaining errors
+    log_message "INFO" "=== WINE ERRORS ==="
+    grep -i "err:\|failed\|missing\|not found" /tmp/mt5_wine_debug.log 2>/dev/null | head -50
+    log_message "INFO" "=== END WINE ERRORS ==="
 
     # Poll for completion
     log_message "INFO" "Waiting for MT5 binary..."
