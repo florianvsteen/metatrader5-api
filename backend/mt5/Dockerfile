@@ -10,19 +10,8 @@ RUN mkdir -p /config/.wine && \
     chown -R abc:abc /config/.wine && \
     chmod -R 755 /config/.wine
 
-# Update package lists only — no upgrade needed
-RUN apt-get update --fix-missing -o Acquire::Check-Valid-Until=false
-
-# Install required packages
-RUN apt-get install -y \
-    dos2unix \
-    python3-pip \
-    wget \
-    python3-xdg \
-    netcat \
-    && pip3 install --upgrade pip \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Update package lists and upgrade packages
+RUN apt-get update && apt-get upgrade -y
 
 # Install required packages
 RUN apt-get install -y \
