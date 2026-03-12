@@ -62,11 +62,17 @@ else
     fi
     log_message "INFO" "Download complete: $(ls -lh /tmp/mt5setup.exe | awk '{print $5}')"
 
-    # Run installer
+    # Run installer with HTTP debug logging
     log_message "INFO" "Running MT5 installer..."
-    DISPLAY=:0 WINEDEBUG=err+all $wine_executable /tmp/mt5setup.exe /auto
+    DISPLAY=:0 WINEDEBUG=+winhttp,+wininet,err+all \
+        $wine_executable /tmp/mt5setup.exe /auto 2>&1 | tee -a /var/log/mt5_wine_debug.log
     DISPLAY=:0 wineserver --wait
     log_message "INFO" "Installer process exited."
+
+    # Dump relevant Wine HTTP debug lines
+    log_message "INFO" "=== WINE HTTP DEBUG ==="
+    grep -i "winhttp\|wininet\|connect\|error\|fail\|https\|download" \
+        /var/log/mt5_wine_debug.log 2>/dev/null | head -50
 
     # Poll for completion
     log_message "INFO" "Waiting for MT5 to finish installing..."
