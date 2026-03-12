@@ -31,7 +31,7 @@ services:
       - static_volume:/app/staticfiles
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8120:8000"
     depends_on:
       - postgres
       - redis
