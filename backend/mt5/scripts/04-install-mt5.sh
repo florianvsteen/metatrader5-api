@@ -30,13 +30,21 @@ else
     DISPLAY=:0 $wine_executable reg add "HKEY_CURRENT_USER\\Software\\Wine" /v Version /t REG_SZ /d "win10" /f
     DISPLAY=:0 wineserver --wait
 
-    # Install root certificates and winhttp
-    log_message "INFO" "Installing Wine certificates..."
-    DISPLAY=:0 winetricks -q certs
+    # Install all required runtime dependencies for MT5
+    log_message "INFO" "Installing vcrun2019 (Visual C++ runtime)..."
+    DISPLAY=:0 winetricks -q vcrun2019
+    DISPLAY=:0 wineserver --wait
+
+    log_message "INFO" "Installing dotnet48..."
+    DISPLAY=:0 winetricks -q dotnet48
     DISPLAY=:0 wineserver --wait
 
     log_message "INFO" "Installing winhttp..."
     DISPLAY=:0 winetricks -q winhttp
+    DISPLAY=:0 wineserver --wait
+
+    log_message "INFO" "Installing root certificates..."
+    DISPLAY=:0 winetricks -q rootcerts
     DISPLAY=:0 wineserver --wait
 
     # Wait for network
@@ -60,43 +68,36 @@ else
     fi
     log_message "INFO" "Download complete: $(ls -lh /tmp/mt5setup.exe | awk '{print $5}')"
 
-    # Attempt 1: /auto with explicit InstallPath
-    log_message "INFO" "Attempt 1: /auto with /InstallPath..."
+    # Run installer with explicit path
+    log_message "INFO" "Running MT5 installer (attempt 1: /auto /InstallPath)..."
     DISPLAY=:0 WINEDEBUG=+winhttp,+wininet,err+all \
         $wine_executable /tmp/mt5setup.exe /auto \
         "/InstallPath=C:\\Program Files\\MetaTrader 5" 2>&1 | tee /tmp/mt5_wine_debug.log
     DISPLAY=:0 wineserver --wait
     log_message "INFO" "Attempt 1 exited."
 
-    # Check if installed
-    if [ -e "$mt5file" ]; then
-        log_message "INFO" "MT5 installed after attempt 1."
-    else
-        log_message "INFO" "Attempt 1 failed, trying attempt 2: /auto /portable..."
+    if [ ! -e "$mt5file" ]; then
+        log_message "INFO" "Attempt 1 failed. Trying /auto /portable..."
         DISPLAY=:0 WINEDEBUG=+winhttp,+wininet,err+all \
             $wine_executable /tmp/mt5setup.exe /auto /portable 2>&1 | tee /tmp/mt5_wine_debug.log
         DISPLAY=:0 wineserver --wait
         log_message "INFO" "Attempt 2 exited."
     fi
 
-    # Check if installed
-    if [ -e "$mt5file" ]; then
-        log_message "INFO" "MT5 installed after attempt 2."
-    else
-        log_message "INFO" "Attempt 2 failed, trying attempt 3: no flags (interactive)..."
+    if [ ! -e "$mt5file" ]; then
+        log_message "INFO" "Attempt 2 failed. Trying interactive (check VNC)..."
         DISPLAY=:0 WINEDEBUG=+winhttp,+wininet,err+all \
             $wine_executable /tmp/mt5setup.exe 2>&1 | tee /tmp/mt5_wine_debug.log
         DISPLAY=:0 wineserver --wait
         log_message "INFO" "Attempt 3 exited."
     fi
 
-    # Dump Wine HTTP debug for diagnosis
-    log_message "INFO" "=== WINE HTTP DEBUG ==="
-    grep -i "winhttp\|wininet\|connect\|error\|fail\|https\|download\|request\|response" \
-        /tmp/mt5_wine_debug.log 2>/dev/null | head -80
-    log_message "INFO" "=== END WINE HTTP DEBUG ==="
+    # Dump Wine HTTP debug
+    log_message "INFO" "=== WINE DEBUG OUTPUT ==="
+    cat /tmp/mt5_wine_debug.log 2>/dev/null | grep -v "^$" | head -100
+    log_message "INFO" "=== END WINE DEBUG ==="
 
-    # Poll for completion after any attempt
+    # Poll for completion
     log_message "INFO" "Waiting for MT5 binary..."
     for i in $(seq 1 72); do
         if [ -e "$mt5file" ]; then
@@ -115,5 +116,5 @@ if [ -e "$mt5file" ]; then
     log_message "INFO" "MT5 installed. Launching..."
     DISPLAY=:0 $wine_executable "$mt5file" &
 else
-    log_message "ERROR" "MT5 binary not found after all install attempts. See logs above."
+    log_message "ERROR" "MT5 binary not found after all install attempts."
 fi
