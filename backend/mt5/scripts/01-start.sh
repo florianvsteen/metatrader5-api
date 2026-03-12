@@ -1,16 +1,13 @@
 #!/bin/bash
-
-# Source common variables and functions
 source /scripts/02-common.sh
 
-# Run installation scripts
+# Redirect all output to stdout so Portainer captures everything
+exec 1> >(tee -a /var/log/mt5_setup.log) 2>&1
+
 /scripts/03-install-mono.sh
 /scripts/04-install-mt5.sh
 /scripts/05-install-python.sh
 /scripts/06-install-libraries.sh
-
-# Start servers
 /scripts/07-start-wine-flask.sh
 
-# Keep the script running
 tail -f /dev/null
