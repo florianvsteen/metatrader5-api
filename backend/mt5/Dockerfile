@@ -1,5 +1,5 @@
 # Stage 1: Base image with apt packages
-FROM --platform=linux/amd64 ghcr.io/linuxserver/baseimage-kasmvnc AS base
+FROM ghcr.io/linuxserver/baseimage-kasmvnc:arch-version-2025-07-12@sha256:41e3f93e819658f816621fd5f6ad75d6300ed96d3300f4a346af799ed09985f2 AS base
 ENV TITLE=MetaTrader
 ENV WINEARCH=win64
 ENV WINEPREFIX="/config/.wine"
