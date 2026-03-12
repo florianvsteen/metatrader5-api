@@ -10,16 +10,36 @@ if [ -e "$mt5file" ]; then
 else
     log_message "INFO" "MT5 not found. Installing..."
 
+    # Wait for display to be ready
+    log_message "INFO" "Waiting for display..."
+    for i in $(seq 1 20); do
+        DISPLAY=:0 xdpyinfo >/dev/null 2>&1 && break
+        log_message "INFO" "Display not ready, attempt $i/20..."
+        sleep 3
+    done
+    log_message "INFO" "Display is ready."
+
+    # Initialize Wine prefix fully
+    log_message "INFO" "Initializing Wine prefix..."
+    DISPLAY=:0 wineboot --init
+    log_message "INFO" "Waiting for Wine prefix to finish initializing..."
+    DISPLAY=:0 wineserver --wait
+    log_message "INFO" "Wine prefix initialized."
+
     # Set Wine to Windows 10 mode
+    log_message "INFO" "Setting Wine to Windows 10 mode..."
     DISPLAY=:0 $wine_executable reg add "HKEY_CURRENT_USER\\Software\\Wine" /v Version /t REG_SZ /d "win10" /f
+    DISPLAY=:0 wineserver --wait
 
     # Install root certificates so Wine can verify MetaQuotes CDN TLS
     log_message "INFO" "Installing Wine certificates..."
     DISPLAY=:0 winetricks -q certs
+    DISPLAY=:0 wineserver --wait
 
     # Install winhttp so the MT5 installer can make HTTPS calls internally
     log_message "INFO" "Installing winhttp..."
     DISPLAY=:0 winetricks -q winhttp
+    DISPLAY=:0 wineserver --wait
 
     # Wait for network
     log_message "INFO" "Waiting for network..."
@@ -28,6 +48,7 @@ else
         log_message "INFO" "Network not ready, attempt $i/10..."
         sleep 5
     done
+    log_message "INFO" "Network is ready."
 
     # Download installer
     log_message "INFO" "Downloading MT5 installer..."
@@ -39,9 +60,13 @@ else
         log_message "ERROR" "Download failed or file is empty."
         exit 1
     fi
+    log_message "INFO" "Download complete: $(ls -lh /tmp/mt5setup.exe | awk '{print $5}')"
 
+    # Run installer
     log_message "INFO" "Running MT5 installer..."
     DISPLAY=:0 WINEDEBUG=err+all $wine_executable /tmp/mt5setup.exe /auto
+    DISPLAY=:0 wineserver --wait
+    log_message "INFO" "Installer process exited."
 
     # Poll for completion
     log_message "INFO" "Waiting for MT5 to finish installing..."
