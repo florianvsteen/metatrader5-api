@@ -11,7 +11,7 @@ services:
     restart: unless-stopped
     ports:
       - "6789:3000"   # VNC
-      - "6767:5001"   # API
+      - "6868:5001"   # API
 
   postgres:
     image: postgres:15-alpine
