@@ -1,5 +1,5 @@
 # Stage 1: Base image with apt packages
-FROM ghcr.io/linuxserver/baseimage-kasmvnc:debianbullseye-8446af38-ls104 AS base
+FROM ghcr.io/linuxserver/baseimage-kasmvnc:debianbullseye AS base
 
 ENV TITLE=MetaTrader
 ENV WINEARCH=win64
