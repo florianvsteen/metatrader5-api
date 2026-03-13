@@ -6,6 +6,7 @@ services:
     container_name: mt5
     volumes:
       - ./config:/config
+      - mt5_programs:/config/.wine/drive_c/Program Files/MetaTrader 5
     networks:
       - openclaw_shared
     restart: unless-stopped
@@ -116,6 +117,12 @@ services:
 volumes:
   postgres-data: {}
   static_volume: {}
+  mt5_programs:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: "addr=192.168.120.82,rw,nfsvers=4,soft"
+      device: ":/mnt/user/mt5"
 
 networks:
   openclaw_shared:
