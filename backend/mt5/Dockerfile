@@ -27,14 +27,14 @@ RUN mkdir -pm755 /etc/apt/keyrings \
     && echo "deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/ubuntu/ jammy main" \
        > /etc/apt/sources.list.d/winehq-jammy.list
 
-# Install Wine 8.0.2 stable (pinned - Wine 9+ breaks MT5 socket handling)
+# Install Wine 10.0 stable (required by MT5 build 5483+)
 RUN dpkg --add-architecture i386 && \
     apt-get update && \
     apt-get install --install-recommends -y \
-        winehq-stable=8.0.2~jammy-1 \
-        wine-stable=8.0.2~jammy-1 \
-        wine-stable-amd64=8.0.2~jammy-1 \
-        wine-stable-i386:i386=8.0.2~jammy-1 \
+        winehq-stable=10.0.0.0~jammy-1 \
+        wine-stable=10.0.0.0~jammy-1 \
+        wine-stable-amd64=10.0.0.0~jammy-1 \
+        wine-stable-i386:i386=10.0.0.0~jammy-1 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -48,6 +48,10 @@ RUN dos2unix /scripts/*.sh && \
     chmod +x /scripts/*.sh
 
 COPY /root /
+
+# Create log file with correct permissions
+RUN touch /tmp/mt5_setup.log && \
+    chmod 666 /tmp/mt5_setup.log
 
 # Wine prefix directory with correct ownership
 RUN mkdir -p /config/.wine && \
