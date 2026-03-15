@@ -13,6 +13,8 @@ services:
     ports:
       - "6789:3000"   # VNC
       - "6868:5001"   # API
+    environment:
+      - MT5_API_PORT=5001
     security_opt:
       - seccomp=unconfined
     logging:
