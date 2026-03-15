@@ -27,10 +27,14 @@ RUN mkdir -pm755 /etc/apt/keyrings \
     && echo "deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/ubuntu/ jammy main" \
        > /etc/apt/sources.list.d/winehq-jammy.list
 
-# Install Wine stable
+# Install Wine 8.0.2 stable (pinned - Wine 9+ breaks MT5 socket handling)
 RUN dpkg --add-architecture i386 && \
     apt-get update && \
-    apt-get install --install-recommends -y winehq-stable \
+    apt-get install --install-recommends -y \
+        winehq-stable=8.0.2~jammy-1 \
+        wine-stable=8.0.2~jammy-1 \
+        wine-stable-amd64=8.0.2~jammy-1 \
+        wine-stable-i386:i386=8.0.2~jammy-1 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
