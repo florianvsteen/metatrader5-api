@@ -26,18 +26,10 @@ else
     log_message "INFO" "Wine prefix already exists, skipping init."
 fi
 
-# Disable Wine debugger so MT5 doesn't detect it as a debugger
-DISPLAY=:0 $wine_executable reg add \
-    "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AeDebug" \
-    /v Debugger /t REG_SZ /d "" /f 2>/dev/null || true
-DISPLAY=:0 $wine_executable reg add \
-    "HKEY_LOCAL_MACHINE\\Software\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\AeDebug" \
-    /v Debugger /t REG_SZ /d "" /f 2>/dev/null || true
-
 # Launch MT5
 if [ -e "$mt5file" ]; then
     log_message "INFO" "Launching MT5: $mt5file"
-    DISPLAY=:0 WINEDEBUG=-all $wine_executable "$mt5file" &
+    DISPLAY=:0 $wine_executable "$mt5file" &
 else
     log_message "ERROR" "MT5 binary not found at: $mt5file"
     log_message "INFO" "Contents of Program Files:"
