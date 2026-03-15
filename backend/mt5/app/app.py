@@ -36,12 +36,27 @@ app.register_blueprint(error_bp)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 if __name__ == '__main__':
-    # Retry MT5 initialization - MT5 terminal may still be starting up
+    # Read broker credentials from env vars
+    mt5_login = os.environ.get('MT5_LOGIN')
+    mt5_password = os.environ.get('MT5_PASSWORD')
+    mt5_server = os.environ.get('MT5_SERVER')
+
+    # Retry MT5 initialization
     max_retries = 10
     retry_delay = 5
     for attempt in range(1, max_retries + 1):
-        if mt5.initialize():
+        if mt5_login and mt5_password and mt5_server:
+            result = mt5.initialize(
+                login=int(mt5_login),
+                password=mt5_password,
+                server=mt5_server
+            )
+        else:
+            result = mt5.initialize()
+
+        if result:
             logger.info(f"MT5 initialized successfully on attempt {attempt}.")
+            logger.info(f"MT5 version: {mt5.version()}")
             break
         logger.warning(f"MT5 initialization attempt {attempt}/{max_retries} failed. Retrying in {retry_delay}s...")
         time.sleep(retry_delay)
