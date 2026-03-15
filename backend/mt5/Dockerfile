@@ -13,11 +13,11 @@ RUN apt-get update && apt-get install -y \
     wget \
     python3-xdg \
     netcat-openbsd \
-    ca-certificates \
-    && update-ca-certificates \
     && pip3 install --upgrade pip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+    
+RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
 
 # Add WineHQ repository
 RUN wget -q -O /tmp/winehq.key https://dl.winehq.org/wine-builds/winehq.key \
