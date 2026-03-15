@@ -6,52 +6,46 @@ ENV WINEPREFIX="/config/.wine"
 ENV DISPLAY=:0
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN mkdir -p /config/.wine && \
-    chown -R abc:abc /config/.wine && \
-    chmod -R 755 /config/.wine
-
+# Basic dependencies only - no winetricks/cabextract/wine32 needed
 RUN apt-get update && apt-get install -y \
     dos2unix \
     python3-pip \
     wget \
     python3-xdg \
     netcat-openbsd \
+    ca-certificates \
+    && update-ca-certificates \
     && pip3 install --upgrade pip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
+# Add WineHQ repository
+RUN wget -q -O /tmp/winehq.key https://dl.winehq.org/wine-builds/winehq.key \
+    && apt-key add /tmp/winehq.key \
+    && add-apt-repository 'deb https://dl.winehq.org/wine-builds/ubuntu/ jammy main' \
+    && rm /tmp/winehq.key
 
-# Add WineHQ repository key and APT source
-RUN wget -q https://dl.winehq.org/wine-builds/winehq.key > /dev/null 2>&1\
-    && apt-key add winehq.key \
-    && add-apt-repository 'deb https://dl.winehq.org/wine-builds/debian/ bullseye main' \
-    && rm winehq.key
-
-# Add i386 architecture and update package lists
-RUN dpkg --add-architecture i386 && \
-    apt-get update && \
-    apt-get install -y wine32
-
-# Install WineHQ stable package and dependencies
-RUN apt-get install --install-recommends -y \
-    winehq-stable \
+# Install Wine stable (64-bit only - MT5 files are pre-copied, no installer needed)
+RUN apt-get update && \
+    apt-get install --install-recommends -y winehq-stable \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Stage 2: Final image
 FROM base
 
-# Copy the scripts directory and convert start.sh to Unix format
+# Copy scripts and app
 COPY app /app
 COPY scripts /scripts
 RUN dos2unix /scripts/*.sh && \
     chmod +x /scripts/*.sh
 
 COPY /root /
-RUN touch /var/log/mt5_setup.log && \
-    chown abc:abc /var/log/mt5_setup.log && \
-    chmod 644 /var/log/mt5_setup.log
+
+# Wine prefix directory with correct ownership
+RUN mkdir -p /config/.wine && \
+    chown -R abc:abc /config && \
+    chmod -R 755 /config
 
 EXPOSE 3000 5000 5001 8001 18812
 VOLUME /config
