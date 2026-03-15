@@ -6,27 +6,30 @@ ENV WINEPREFIX="/config/.wine"
 ENV DISPLAY=:0
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Basic dependencies only - no winetricks/cabextract/wine32 needed
+# Basic dependencies
 RUN apt-get update && apt-get install -y \
     dos2unix \
     python3-pip \
     wget \
     python3-xdg \
     netcat-openbsd \
+    ca-certificates \
+    software-properties-common \
+    gnupg2 \
+    && update-ca-certificates \
     && pip3 install --upgrade pip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-    
-RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
 
-# Add WineHQ repository
-RUN wget -q -O /tmp/winehq.key https://dl.winehq.org/wine-builds/winehq.key \
-    && apt-key add /tmp/winehq.key \
-    && add-apt-repository 'deb https://dl.winehq.org/wine-builds/ubuntu/ jammy main' \
-    && rm /tmp/winehq.key
+# Add WineHQ repository for Ubuntu Jammy
+RUN mkdir -pm755 /etc/apt/keyrings \
+    && wget -q https://dl.winehq.org/wine-builds/winehq.key -O /etc/apt/keyrings/winehq-archive.key \
+    && echo "deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/ubuntu/ jammy main" \
+       > /etc/apt/sources.list.d/winehq-jammy.list
 
-# Install Wine stable (64-bit only - MT5 files are pre-copied, no installer needed)
-RUN apt-get update && \
+# Install Wine stable
+RUN dpkg --add-architecture i386 && \
+    apt-get update && \
     apt-get install --install-recommends -y winehq-stable \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
