@@ -3,6 +3,8 @@ import MetaTrader5 as mt5
 
 class MT5Timeframe(Enum):
     M1 = mt5.TIMEFRAME_M1       # 1-minute
+    M2 = mt5.TIMEFRAME_M2       # 2-minute
+    M3 = mt5.TIMEFRAME_M3       # 3-minute
     M5 = mt5.TIMEFRAME_M5       # 5-minute
     M15 = mt5.TIMEFRAME_M15     # 15-minute
     M30 = mt5.TIMEFRAME_M30     # 30-minute
