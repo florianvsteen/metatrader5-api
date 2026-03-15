@@ -15,6 +15,9 @@ services:
       - "6868:5001"   # API
     environment:
       - MT5_API_PORT=5001
+      - MT5_LOGIN=${MT5_LOGIN}
+      - MT5_PASSWORD=${MT5_PASSWORD}
+      - MT5_SERVER=${MT5_SERVER}
     security_opt:
       - seccomp=unconfined
     logging:
