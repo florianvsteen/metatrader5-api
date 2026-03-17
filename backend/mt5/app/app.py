@@ -15,6 +15,7 @@ from routes.position import position_bp
 from routes.order import order_bp
 from routes.history import history_bp
 from routes.error import error_bp
+from routes.calendar import calendar_bp
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ app.register_blueprint(position_bp)
 app.register_blueprint(order_bp)
 app.register_blueprint(history_bp)
 app.register_blueprint(error_bp)
+app.register_blueprint(calendar_bp)
 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
